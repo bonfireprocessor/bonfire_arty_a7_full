@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spirit:abstractionDefinition xmlns:xilinx="http://www.xilinx.com" xmlns:spirit="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <spirit:vendor>bonfire.eu</spirit:vendor>
+  <spirit:library>user</spirit:library>
+  <spirit:name>wishbone_slave_rtl</spirit:name>
+  <spirit:version>1.0</spirit:version>
+  <spirit:busType spirit:vendor="bonfire.eu" spirit:library="user" spirit:name="wishbone_slave" spirit:version="1.0"/>
+  <spirit:ports>
+    <spirit:port>
+      <spirit:logicalName>dummy</spirit:logicalName>
+      <spirit:wire/>
+    </spirit:port>
+  </spirit:ports>
+</spirit:abstractionDefinition>

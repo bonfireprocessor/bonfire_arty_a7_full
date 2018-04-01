@@ -1,0 +1,26 @@
+CAPI=1
+[main]
+name = ::zpuino-uart:0
+depend = ::bonfire-util:0
+backend = ise
+simulators=ghdl isim
+
+[fileset rtl]
+files = tx_unit.vhd uart_brgen.vhd uart_mv_filter.vhd uart_rx.vhd zpuino_uart.vhd zpuino_uart_fifo.vhd
+file_type=vhdlSource
+
+[fileset sim]
+files = tb/tb_zpuino_uart.vhd
+file_type=vhdlSource
+#usage=sim
+scope = private
+
+[simulator]
+toplevel = tb_zpuino_uart
+
+[provider]
+name=github
+user=ThomasHornschuh
+repo=zpuino-uart
+version=v1.1
+

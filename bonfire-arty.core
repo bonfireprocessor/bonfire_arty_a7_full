@@ -1,0 +1,36 @@
+CAPI=1
+[main]
+name = ::bonfire-arty-a7:0
+depend = ::bonfire-axi:0 ::bonfire-axi4l2wb:0 ::zpuino-uart:0
+backend = vivado
+
+
+[fileset rtl]
+files = bonfire_axi_sysio.vhd wb_io.vhd
+    wb_spi_interface.vhd
+    spimaster.vhd
+    BootMem.vhd
+    wishbone_subsystem.vhd
+file_type=vhdlSource
+
+[fileset xdc]
+files = Arty.xdc
+file_type=xdc
+scope=synth
+
+[fileset scripts]
+file_type=tclSource
+files = scripts/fusesoc_build_1.tcl  scripts/bd_bonfire_arty_1704.tcl  scripts/fusesoc_build_2.tcl
+
+
+[simulator]
+toplevel = bonfire_axi_top
+
+[ghdl]
+analyze_options = --ieee=synopsys
+run_options = --ieee=synopsys
+
+[vivado]
+part=xc7a35ticsg324-1L
+
+
