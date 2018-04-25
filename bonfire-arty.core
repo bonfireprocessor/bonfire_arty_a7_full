@@ -20,7 +20,7 @@ scope=synth
 
 [fileset scripts]
 file_type=tclSource
-files = scripts/fusesoc_build_1.tcl  scripts/bd_bonfire_arty_1704.tcl  scripts/fusesoc_build_2.tcl
+files = scripts/fusesoc_build_1.tcl  scripts/bd_bonfire_arty_2018.1.tcl  scripts/fusesoc_build_2.tcl
 
 
 [simulator]
