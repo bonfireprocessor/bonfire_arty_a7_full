@@ -11,6 +11,12 @@ variable script_folder
 set script_folder [_tcl::get_script_folder]
 
 
+# Import Block Design
+set vivado_version [version -short]
+
+source $script_folder/bd_bonfire_arty_$vivado_version.tcl
+
+
 save_bd_design
 regenerate_bd_layout
 set_property -dict [list CONFIG.RamFileName $script_folder/../compiled_code/ARTY_AXI_monitor.hex] [get_bd_cells BootMem_0]
