@@ -5,6 +5,7 @@ depend = ::bonfire-axi:0 ::bonfire-axi4l2wb:0 ::zpuino-uart:0
 backend = vivado
 
 
+
 [fileset rtl]
 files = bonfire_axi_sysio.vhd wb_io.vhd
     wb_spi_interface.vhd
@@ -18,15 +19,15 @@ files = Arty.xdc
 file_type=xdc
 scope=synth
 
-[fileset scripts]
+
+[fileset blockdesign]
 file_type=tclSource
-files = scripts/fusesoc_build_1.tcl scripts/fusesoc_build_2.tcl
+files =  scripts/fusesoc_build.tcl
+
 
 [fileset user_scripts]
 files= scripts/bd_bonfire_arty_2018.1.tcl
 file_type=user
-
-
 
 [vivado]
 part=xc7a35ticsg324-1L
