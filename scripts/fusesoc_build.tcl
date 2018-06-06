@@ -12,9 +12,10 @@ proc get_script_folder {} {
 
 variable script_folder
 set script_folder [_tcl::get_script_folder]
+puts $script_folder
 
 # Add local ip repos
-set_property  ip_repo_paths  $script_folder/../ip_repo [current_project]
+set_property  ip_repo_paths [ concat  $script_folder/../ip_repo $script_folder/../bonfire-gpio-ip ] [current_project ]
 update_ip_catalog
 
 

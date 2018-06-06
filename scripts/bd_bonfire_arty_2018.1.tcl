@@ -38,9 +38,9 @@ if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
 # source design_1_script.tcl
 
 
-# The design that will be created by this Tcl script contains the following 
+# The design that will be created by this Tcl script contains the following
 # module references:
-# BootMem, bonfire_axi_top, bonfire_axi4l2wb, bonfire_axi4l2wb, wishbone_subsystem, zpuino_uart, zpuino_uart
+# BootMem, bonfire_axi_top, wishbone_subsystem, bonfire_axi4l2wb, zpuino_uart, bonfire_axi4l2wb, zpuino_uart
 
 # Please add the sources of those modules before sourcing this Tcl script.
 
@@ -96,7 +96,7 @@ if { ${design_name} eq "" } {
    set errMsg "Design <$design_name> already exists in your project, please set the variable <design_name> to another value."
    set nRet 1
 } elseif { [get_files -quiet ${design_name}.bd] ne "" } {
-   # USE CASES: 
+   # USE CASES:
    #    6) Current opened design, has components, but diff names, design_name exists in project.
    #    7) No opened design, design_name exists in project.
 
@@ -130,13 +130,15 @@ set bCheckIPsPassed 1
 ##################################################################
 set bCheckIPs 1
 if { $bCheckIPs == 1 } {
-   set list_check_ips "\ 
+   set list_check_ips "\
 xilinx.com:ip:axi_ethernetlite:3.0\
 xilinx.com:ip:axi_gpio:2.0\
-xilinx.com:ip:axi_quad_spi:3.2\
+bonfirecpu.eu:user:bonfire_gpio_core:1.2.2\
 xilinx.com:ip:clk_wiz:6.0\
 xilinx.com:ip:mig_7series:4.1\
 xilinx.com:ip:proc_sys_reset:5.0\
+xilinx.com:ip:axi_quad_spi:3.2\
+digilentinc.com:ip:pmod_bridge:1.0\
 "
 
    set list_ips_missing ""
@@ -161,13 +163,13 @@ xilinx.com:ip:proc_sys_reset:5.0\
 ##################################################################
 set bCheckModules 1
 if { $bCheckModules == 1 } {
-   set list_check_mods "\ 
+   set list_check_mods "\
 BootMem\
 bonfire_axi_top\
-bonfire_axi4l2wb\
-bonfire_axi4l2wb\
 wishbone_subsystem\
+bonfire_axi4l2wb\
 zpuino_uart\
+bonfire_axi4l2wb\
 zpuino_uart\
 "
 
@@ -347,6 +349,337 @@ proc write_mig_file_design_1_mig_7series_0_0 { str_mig_prj_filepath } {
 ##################################################################
 
 
+# Hierarchical cell: uart1
+proc create_hier_cell_uart1 { parentCell nameHier } {
+
+  variable script_folder
+
+  if { $parentCell eq "" || $nameHier eq "" } {
+     catch {common::send_msg_id "BD_TCL-102" "ERROR" "create_hier_cell_uart1() - Empty argument(s)!"}
+     return
+  }
+
+  # Get object for parentCell
+  set parentObj [get_bd_cells $parentCell]
+  if { $parentObj == "" } {
+     catch {common::send_msg_id "BD_TCL-100" "ERROR" "Unable to find parent cell <$parentCell>!"}
+     return
+  }
+
+  # Make sure parentObj is hier blk
+  set parentType [get_property TYPE $parentObj]
+  if { $parentType ne "hier" } {
+     catch {common::send_msg_id "BD_TCL-101" "ERROR" "Parent <$parentObj> has TYPE = <$parentType>. Expected to be <hier>."}
+     return
+  }
+
+  # Save current instance; Restore later
+  set oldCurInst [current_bd_instance .]
+
+  # Set parent object as current
+  current_bd_instance $parentObj
+
+  # Create cell and set as current instance
+  set hier_obj [create_bd_cell -type hier $nameHier]
+  current_bd_instance $hier_obj
+
+  # Create interface pins
+  create_bd_intf_pin -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 S_AXI
+  create_bd_intf_pin -mode Master -vlnv digilentinc.com:interface:pmod_rtl:1.0 jd
+
+  # Create pins
+  create_bd_pin -dir I -type clk S_AXI_ACLK
+  create_bd_pin -dir I -type rst S_AXI_ARESETN
+  create_bd_pin -dir O wb_inta_o
+
+  # Create instance: pmod_bridge_0, and set properties
+  set pmod_bridge_0 [ create_bd_cell -type ip -vlnv digilentinc.com:ip:pmod_bridge:1.0 pmod_bridge_0 ]
+  set_property -dict [ list \
+   CONFIG.Bottom_Row_Interface {Disabled} \
+   CONFIG.PMOD {jd} \
+   CONFIG.Top_Row_Interface {UART} \
+   CONFIG.USE_BOARD_FLOW {true} \
+ ] $pmod_bridge_0
+
+  # Create instance: uart_axibridge1, and set properties
+  set block_name bonfire_axi4l2wb
+  set block_cell_name uart_axibridge1
+  if { [catch {set uart_axibridge1 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+     catch {common::send_msg_id "BD_TCL-105" "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   } elseif { $uart_axibridge1 eq "" } {
+     catch {common::send_msg_id "BD_TCL-106" "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   }
+    set_property -dict [ list \
+   CONFIG.ADRWIDTH {4} \
+   CONFIG.FAST_READ_TERM {false} \
+ ] $uart_axibridge1
+
+  set_property -dict [ list \
+   CONFIG.SUPPORTS_NARROW_BURST {0} \
+   CONFIG.NUM_READ_OUTSTANDING {1} \
+   CONFIG.NUM_WRITE_OUTSTANDING {1} \
+   CONFIG.MAX_BURST_LENGTH {1} \
+ ] [get_bd_intf_pins /uart1/uart_axibridge1/S_AXI]
+
+  # Create instance: zpuino_uart_1, and set properties
+  set block_name zpuino_uart
+  set block_cell_name zpuino_uart_1
+  if { [catch {set zpuino_uart_1 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+     catch {common::send_msg_id "BD_TCL-105" "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   } elseif { $zpuino_uart_1 eq "" } {
+     catch {common::send_msg_id "BD_TCL-106" "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   }
+    set_property -dict [ list \
+   CONFIG.bits {6} \
+   CONFIG.extended {true} \
+ ] $zpuino_uart_1
+
+  # Create interface connections
+  connect_bd_intf_net -intf_net Conn1 [get_bd_intf_pins jd] [get_bd_intf_pins pmod_bridge_0/Pmod_out]
+  connect_bd_intf_net -intf_net bonfire_axi4l2wb_1_WB_MASTER [get_bd_intf_pins uart_axibridge1/WB_MASTER] [get_bd_intf_pins zpuino_uart_1/WB_SLAVE]
+  connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M04_AXI [get_bd_intf_pins S_AXI] [get_bd_intf_pins uart_axibridge1/S_AXI]
+  connect_bd_intf_net -intf_net zpuino_uart_1_UART [get_bd_intf_pins pmod_bridge_0/UART_Top_Row] [get_bd_intf_pins zpuino_uart_1/UART]
+
+  # Create port connections
+  connect_bd_net -net bonfire_axi4l2wb_1_wb_clk_o [get_bd_pins uart_axibridge1/wb_clk_o] [get_bd_pins zpuino_uart_1/wb_clk_i]
+  connect_bd_net -net bonfire_axi4l2wb_1_wb_rst_o [get_bd_pins uart_axibridge1/wb_rst_o] [get_bd_pins zpuino_uart_1/wb_rst_i]
+  connect_bd_net -net mig_7series_0_ui_clk [get_bd_pins S_AXI_ACLK] [get_bd_pins uart_axibridge1/S_AXI_ACLK]
+  connect_bd_net -net rst_mig_7series_0_83M_peripheral_aresetn [get_bd_pins S_AXI_ARESETN] [get_bd_pins uart_axibridge1/S_AXI_ARESETN]
+  connect_bd_net -net zpuino_uart_1_wb_inta_o [get_bd_pins wb_inta_o] [get_bd_pins zpuino_uart_1/wb_inta_o]
+
+  # Perform GUI Layout
+  regenerate_bd_layout -hierarchy [get_bd_cells /uart1] -layout_string {
+   ExpandedHierarchyInLayout: "",
+   guistr: "# # String gsaved with Nlview 6.8.5  2018-01-30 bk=1.4354 VDI=40 GEI=35 GUI=JA:1.6 TLS
+#  -string -flagsOSRD
+preplace port S_AXI_ACLK -pg 1 -y 150 -defaultsOSRD
+preplace port S_AXI_ARESETN -pg 1 -y 170 -defaultsOSRD
+preplace port wb_inta_o -pg 1 -y 180 -defaultsOSRD
+preplace port jd -pg 1 -y 90 -defaultsOSRD
+preplace port S_AXI -pg 1 -y 130 -defaultsOSRD
+preplace inst zpuino_uart_1 -pg 1 -lvl 2 -y 150 -defaultsOSRD
+preplace inst pmod_bridge_0 -pg 1 -lvl 3 -y 90 -defaultsOSRD
+preplace inst uart_axibridge1 -pg 1 -lvl 1 -y 150 -defaultsOSRD
+preplace netloc Conn1 1 3 1 N
+preplace netloc bonfire_axi4l2wb_1_wb_clk_o 1 1 1 N
+preplace netloc bonfire_axi4l2wb_1_WB_MASTER 1 1 1 N
+preplace netloc zpuino_uart_1_wb_inta_o 1 2 2 610J 180 N
+preplace netloc rst_mig_7series_0_83M_peripheral_aresetn 1 0 1 NJ
+preplace netloc mig_7series_0_ui_clk 1 0 1 NJ
+preplace netloc bonfire_axi4l2wb_1_wb_rst_o 1 1 1 N
+preplace netloc zpuino_uart_1_UART 1 2 1 610
+preplace netloc bonfire_axi_top_0_axi_periph_M04_AXI 1 0 1 NJ
+levelinfo -pg 1 -20 160 470 780 960 -top 0 -bot 290
+",
+}
+
+  # Restore current instance
+  current_bd_instance $oldCurInst
+}
+
+# Hierarchical cell: uart0
+proc create_hier_cell_uart0 { parentCell nameHier } {
+
+  variable script_folder
+
+  if { $parentCell eq "" || $nameHier eq "" } {
+     catch {common::send_msg_id "BD_TCL-102" "ERROR" "create_hier_cell_uart0() - Empty argument(s)!"}
+     return
+  }
+
+  # Get object for parentCell
+  set parentObj [get_bd_cells $parentCell]
+  if { $parentObj == "" } {
+     catch {common::send_msg_id "BD_TCL-100" "ERROR" "Unable to find parent cell <$parentCell>!"}
+     return
+  }
+
+  # Make sure parentObj is hier blk
+  set parentType [get_property TYPE $parentObj]
+  if { $parentType ne "hier" } {
+     catch {common::send_msg_id "BD_TCL-101" "ERROR" "Parent <$parentObj> has TYPE = <$parentType>. Expected to be <hier>."}
+     return
+  }
+
+  # Save current instance; Restore later
+  set oldCurInst [current_bd_instance .]
+
+  # Set parent object as current
+  current_bd_instance $parentObj
+
+  # Create cell and set as current instance
+  set hier_obj [create_bd_cell -type hier $nameHier]
+  current_bd_instance $hier_obj
+
+  # Create interface pins
+  create_bd_intf_pin -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 S_AXI
+  create_bd_intf_pin -mode Master -vlnv xilinx.com:interface:uart_rtl:1.0 usb_uart
+
+  # Create pins
+  create_bd_pin -dir I -type clk S_AXI_ACLK
+  create_bd_pin -dir I -type rst S_AXI_ARESETN
+  create_bd_pin -dir O wb_inta_o
+
+  # Create instance: uart_axibridge_0, and set properties
+  set block_name bonfire_axi4l2wb
+  set block_cell_name uart_axibridge_0
+  if { [catch {set uart_axibridge_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+     catch {common::send_msg_id "BD_TCL-105" "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   } elseif { $uart_axibridge_0 eq "" } {
+     catch {common::send_msg_id "BD_TCL-106" "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   }
+    set_property -dict [ list \
+   CONFIG.ADRWIDTH {4} \
+   CONFIG.FAST_READ_TERM {false} \
+ ] $uart_axibridge_0
+
+  set_property -dict [ list \
+   CONFIG.SUPPORTS_NARROW_BURST {0} \
+   CONFIG.NUM_READ_OUTSTANDING {1} \
+   CONFIG.NUM_WRITE_OUTSTANDING {1} \
+   CONFIG.MAX_BURST_LENGTH {1} \
+ ] [get_bd_intf_pins /uart0/uart_axibridge_0/S_AXI]
+
+  # Create instance: zpuino_uart_0, and set properties
+  set block_name zpuino_uart
+  set block_cell_name zpuino_uart_0
+  if { [catch {set zpuino_uart_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+     catch {common::send_msg_id "BD_TCL-105" "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   } elseif { $zpuino_uart_0 eq "" } {
+     catch {common::send_msg_id "BD_TCL-106" "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   }
+    set_property -dict [ list \
+   CONFIG.bits {6} \
+   CONFIG.extended {true} \
+ ] $zpuino_uart_0
+
+  # Create interface connections
+  connect_bd_intf_net -intf_net Conn1 [get_bd_intf_pins usb_uart] [get_bd_intf_pins zpuino_uart_0/UART]
+  connect_bd_intf_net -intf_net bonfire_axi4l2wb_0_WB_MASTER [get_bd_intf_pins uart_axibridge_0/WB_MASTER] [get_bd_intf_pins zpuino_uart_0/WB_SLAVE]
+  connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M03_AXI [get_bd_intf_pins S_AXI] [get_bd_intf_pins uart_axibridge_0/S_AXI]
+
+  # Create port connections
+  connect_bd_net -net bonfire_axi4l2wb_0_wb_clk_o [get_bd_pins uart_axibridge_0/wb_clk_o] [get_bd_pins zpuino_uart_0/wb_clk_i]
+  connect_bd_net -net bonfire_axi4l2wb_0_wb_rst_o [get_bd_pins uart_axibridge_0/wb_rst_o] [get_bd_pins zpuino_uart_0/wb_rst_i]
+  connect_bd_net -net mig_7series_0_ui_clk [get_bd_pins S_AXI_ACLK] [get_bd_pins uart_axibridge_0/S_AXI_ACLK]
+  connect_bd_net -net rst_mig_7series_0_83M_peripheral_aresetn [get_bd_pins S_AXI_ARESETN] [get_bd_pins uart_axibridge_0/S_AXI_ARESETN]
+  connect_bd_net -net zpuino_uart_0_wb_inta_o [get_bd_pins wb_inta_o] [get_bd_pins zpuino_uart_0/wb_inta_o]
+
+  # Perform GUI Layout
+  regenerate_bd_layout -hierarchy [get_bd_cells /uart0] -layout_string {
+   ExpandedHierarchyInLayout: "",
+   guistr: "# # String gsaved with Nlview 6.8.5  2018-01-30 bk=1.4354 VDI=40 GEI=35 GUI=JA:1.6 TLS
+#  -string -flagsOSRD
+preplace port S_AXI_ACLK -pg 1 -y 80 -defaultsOSRD
+preplace port S_AXI_ARESETN -pg 1 -y 100 -defaultsOSRD
+preplace port wb_inta_o -pg 1 -y 70 -defaultsOSRD
+preplace port usb_uart -pg 1 -y 50 -defaultsOSRD
+preplace port S_AXI -pg 1 -y 60 -defaultsOSRD
+preplace inst zpuino_uart_0 -pg 1 -lvl 2 -y 80 -defaultsOSRD
+preplace inst uart_axibridge_0 -pg 1 -lvl 1 -y 80 -defaultsOSRD
+preplace netloc Conn1 1 2 1 NJ
+preplace netloc bonfire_axi_top_0_axi_periph_M03_AXI 1 0 1 NJ
+preplace netloc zpuino_uart_0_wb_inta_o 1 2 1 NJ
+preplace netloc bonfire_axi4l2wb_0_wb_rst_o 1 1 1 N
+preplace netloc rst_mig_7series_0_83M_peripheral_aresetn 1 0 1 NJ
+preplace netloc bonfire_axi4l2wb_0_wb_clk_o 1 1 1 N
+preplace netloc mig_7series_0_ui_clk 1 0 1 NJ
+preplace netloc bonfire_axi4l2wb_0_WB_MASTER 1 1 1 N
+levelinfo -pg 1 -20 160 470 630 -top -10 -bot 170
+",
+}
+
+  # Restore current instance
+  current_bd_instance $oldCurInst
+}
+
+# Hierarchical cell: pmod_jb_spi
+proc create_hier_cell_pmod_jb_spi { parentCell nameHier } {
+
+  variable script_folder
+
+  if { $parentCell eq "" || $nameHier eq "" } {
+     catch {common::send_msg_id "BD_TCL-102" "ERROR" "create_hier_cell_pmod_jb_spi() - Empty argument(s)!"}
+     return
+  }
+
+  # Get object for parentCell
+  set parentObj [get_bd_cells $parentCell]
+  if { $parentObj == "" } {
+     catch {common::send_msg_id "BD_TCL-100" "ERROR" "Unable to find parent cell <$parentCell>!"}
+     return
+  }
+
+  # Make sure parentObj is hier blk
+  set parentType [get_property TYPE $parentObj]
+  if { $parentType ne "hier" } {
+     catch {common::send_msg_id "BD_TCL-101" "ERROR" "Parent <$parentObj> has TYPE = <$parentType>. Expected to be <hier>."}
+     return
+  }
+
+  # Save current instance; Restore later
+  set oldCurInst [current_bd_instance .]
+
+  # Set parent object as current
+  current_bd_instance $parentObj
+
+  # Create cell and set as current instance
+  set hier_obj [create_bd_cell -type hier $nameHier]
+  current_bd_instance $hier_obj
+
+  # Create interface pins
+  create_bd_intf_pin -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 AXI_LITE
+  create_bd_intf_pin -mode Master -vlnv digilentinc.com:interface:pmod_rtl:1.0 jb
+
+  # Create pins
+  create_bd_pin -dir I -type clk ext_spi_clk
+  create_bd_pin -dir I -type clk s_axi_aclk
+  create_bd_pin -dir I -type rst s_axi_aresetn
+
+  # Create instance: axi_quad_spi_0, and set properties
+  set axi_quad_spi_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_quad_spi:3.2 axi_quad_spi_0 ]
+  set_property -dict [ list \
+   CONFIG.C_FIFO_DEPTH {0} \
+   CONFIG.C_SCK_RATIO {8} \
+   CONFIG.C_USE_STARTUP {0} \
+   CONFIG.C_USE_STARTUP_INT {0} \
+   CONFIG.FIFO_INCLUDED {0} \
+   CONFIG.Multiples16 {1} \
+   CONFIG.QSPI_BOARD_INTERFACE {Custom} \
+   CONFIG.USE_BOARD_FLOW {true} \
+ ] $axi_quad_spi_0
+
+  # Create instance: pmod_bridge_0, and set properties
+  set pmod_bridge_0 [ create_bd_cell -type ip -vlnv digilentinc.com:ip:pmod_bridge:1.0 pmod_bridge_0 ]
+  set_property -dict [ list \
+   CONFIG.Bottom_Row_Interface {Disabled} \
+   CONFIG.PMOD {jb} \
+   CONFIG.Top_Row_Interface {SPI} \
+   CONFIG.USE_BOARD_FLOW {true} \
+ ] $pmod_bridge_0
+
+  # Create interface connections
+  connect_bd_intf_net -intf_net axi_quad_spi_0_SPI_0 [get_bd_intf_pins axi_quad_spi_0/SPI_0] [get_bd_intf_pins pmod_bridge_0/SPI_Top_Row]
+  connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M05_AXI [get_bd_intf_pins AXI_LITE] [get_bd_intf_pins axi_quad_spi_0/AXI_LITE]
+  connect_bd_intf_net -intf_net pmod_bridge_0_Pmod_out [get_bd_intf_pins jb] [get_bd_intf_pins pmod_bridge_0/Pmod_out]
+
+  # Create port connections
+  connect_bd_net -net clk_wiz_0_clk_out1 [get_bd_pins ext_spi_clk] [get_bd_pins axi_quad_spi_0/ext_spi_clk]
+  connect_bd_net -net mig_7series_0_ui_clk [get_bd_pins s_axi_aclk] [get_bd_pins axi_quad_spi_0/s_axi_aclk]
+  connect_bd_net -net rst_mig_7series_0_83M_peripheral_aresetn [get_bd_pins s_axi_aresetn] [get_bd_pins axi_quad_spi_0/s_axi_aresetn]
+
+  # Restore current instance
+  current_bd_instance $oldCurInst
+}
+
 
 # Procedure to create entire design; Provide argument to make
 # procedure reusable. If parentCell is "", will use root.
@@ -385,8 +718,12 @@ proc create_root_design { parentCell } {
   set dip_switches_4bits [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gpio_rtl:1.0 dip_switches_4bits ]
   set eth_mdio_mdc [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:mdio_rtl:1.0 eth_mdio_mdc ]
   set eth_mii [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:mii_rtl:1.0 eth_mii ]
+  set jb [ create_bd_intf_port -mode Master -vlnv digilentinc.com:interface:pmod_rtl:1.0 jb ]
+  set jd [ create_bd_intf_port -mode Master -vlnv digilentinc.com:interface:pmod_rtl:1.0 jd ]
   set led_4bits [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gpio_rtl:1.0 led_4bits ]
   set push_buttons_4bits [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gpio_rtl:1.0 push_buttons_4bits ]
+  set shield_dp0_dp19 [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gpio_rtl:1.0 shield_dp0_dp19 ]
+  set usb_uart [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:uart_rtl:1.0 usb_uart ]
 
   # Create ports
   set eth_ref_clk [ create_bd_port -dir O -type clk eth_ref_clk ]
@@ -394,10 +731,6 @@ proc create_root_design { parentCell } {
   set flash_spi_cs [ create_bd_port -dir O flash_spi_cs ]
   set flash_spi_miso [ create_bd_port -dir I flash_spi_miso ]
   set flash_spi_mosi [ create_bd_port -dir O flash_spi_mosi ]
-  set jb_cs [ create_bd_port -dir O -from 0 -to 0 jb_cs ]
-  set jb_miso [ create_bd_port -dir I jb_miso ]
-  set jb_mosi [ create_bd_port -dir O jb_mosi ]
-  set jb_sclk [ create_bd_port -dir O jb_sclk ]
   set reset [ create_bd_port -dir I -type rst reset ]
   set_property -dict [ list \
    CONFIG.POLARITY {ACTIVE_LOW} \
@@ -407,11 +740,6 @@ proc create_root_design { parentCell } {
    CONFIG.FREQ_HZ {100000000} \
    CONFIG.PHASE {0.000} \
  ] $sys_clock_0
-  set uart0_rxd [ create_bd_port -dir I -type data uart0_rxd ]
-  set uart0_txd [ create_bd_port -dir O -type data uart0_txd ]
-  set uart1_rts [ create_bd_port -dir O uart1_rts ]
-  set uart1_rxd [ create_bd_port -dir I uart1_rxd ]
-  set uart1_txd [ create_bd_port -dir O -type data uart1_txd ]
 
   # Create instance: BootMem_0, and set properties
   set block_name BootMem
@@ -447,8 +775,8 @@ proc create_root_design { parentCell } {
    CONFIG.C_ALL_INPUTS_2 {1} \
    CONFIG.C_GPIO2_WIDTH {4} \
    CONFIG.C_GPIO_WIDTH {4} \
-   CONFIG.C_IS_DUAL {1} \
-   CONFIG.GPIO2_BOARD_INTERFACE {push_buttons_4bits} \
+   CONFIG.C_IS_DUAL {0} \
+   CONFIG.GPIO2_BOARD_INTERFACE {Custom} \
    CONFIG.GPIO_BOARD_INTERFACE {led_4bits} \
    CONFIG.USE_BOARD_FLOW {true} \
  ] $axi_gpio_0
@@ -457,9 +785,14 @@ proc create_root_design { parentCell } {
   set axi_gpio_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 axi_gpio_1 ]
   set_property -dict [ list \
    CONFIG.C_ALL_INPUTS {1} \
+   CONFIG.C_ALL_INPUTS_2 {1} \
+   CONFIG.C_GPIO2_WIDTH {4} \
    CONFIG.C_GPIO_WIDTH {4} \
+   CONFIG.C_INTERRUPT_PRESENT {0} \
+   CONFIG.C_IS_DUAL {1} \
+   CONFIG.GPIO2_BOARD_INTERFACE {push_buttons_4bits} \
    CONFIG.GPIO_BOARD_INTERFACE {dip_switches_4bits} \
-   CONFIG.USE_BOARD_FLOW {false} \
+   CONFIG.USE_BOARD_FLOW {true} \
  ] $axi_gpio_1
 
   # Create instance: axi_mem_intercon, and set properties
@@ -471,19 +804,6 @@ proc create_root_design { parentCell } {
    CONFIG.S00_HAS_DATA_FIFO {1} \
    CONFIG.SYNCHRONIZATION_STAGES {2} \
  ] $axi_mem_intercon
-
-  # Create instance: axi_quad_spi_0, and set properties
-  set axi_quad_spi_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_quad_spi:3.2 axi_quad_spi_0 ]
-  set_property -dict [ list \
-   CONFIG.C_FIFO_DEPTH {0} \
-   CONFIG.C_SCK_RATIO {8} \
-   CONFIG.C_USE_STARTUP {0} \
-   CONFIG.C_USE_STARTUP_INT {0} \
-   CONFIG.FIFO_INCLUDED {0} \
-   CONFIG.Multiples16 {1} \
-   CONFIG.QSPI_BOARD_INTERFACE {Custom} \
-   CONFIG.USE_BOARD_FLOW {true} \
- ] $axi_quad_spi_0
 
   # Create instance: bonfire_axi_top_0, and set properties
   set block_name bonfire_axi_top
@@ -527,9 +847,24 @@ proc create_root_design { parentCell } {
   # Create instance: bonfire_axi_top_0_axi_periph, and set properties
   set bonfire_axi_top_0_axi_periph [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 bonfire_axi_top_0_axi_periph ]
   set_property -dict [ list \
-   CONFIG.NUM_MI {6} \
+   CONFIG.NUM_MI {7} \
    CONFIG.SYNCHRONIZATION_STAGES {2} \
  ] $bonfire_axi_top_0_axi_periph
+
+  # Create instance: bonfire_gpio_core_0, and set properties
+  set bonfire_gpio_core_0 [ create_bd_cell -type ip -vlnv bonfirecpu.eu:user:bonfire_gpio_core:1.2.2 bonfire_gpio_core_0 ]
+  set_property -dict [ list \
+   CONFIG.ADRWIDTH {15} \
+   CONFIG.FAST_READ_TERM {TRUE} \
+   CONFIG.NUM_GPIO {20} \
+ ] $bonfire_gpio_core_0
+
+  #set_property -dict [ list \
+   #CONFIG.SUPPORTS_NARROW_BURST {0} \
+   #CONFIG.NUM_READ_OUTSTANDING {1} \
+   #CONFIG.NUM_WRITE_OUTSTANDING {1} \
+   #CONFIG.MAX_BURST_LENGTH {1} \
+ #] [get_bd_intf_pins /bonfire_gpio_core_0/S_AXI]
 
   # Create instance: clk_wiz_0, and set properties
   set clk_wiz_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz:6.0 clk_wiz_0 ]
@@ -571,52 +906,17 @@ proc create_root_design { parentCell } {
    CONFIG.XML_INPUT_FILE {board.prj} \
  ] $mig_7series_0
 
+  # Create instance: pmod_jb_spi
+  create_hier_cell_pmod_jb_spi [current_bd_instance .] pmod_jb_spi
+
   # Create instance: rst_mig_7series_0_83M, and set properties
   set rst_mig_7series_0_83M [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_mig_7series_0_83M ]
 
-  # Create instance: uart_0, and set properties
-  set block_name bonfire_axi4l2wb
-  set block_cell_name uart_0
-  if { [catch {set uart_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
-     catch {common::send_msg_id "BD_TCL-105" "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
-     return 1
-   } elseif { $uart_0 eq "" } {
-     catch {common::send_msg_id "BD_TCL-106" "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
-     return 1
-   }
-    set_property -dict [ list \
-   CONFIG.ADRWIDTH {4} \
-   CONFIG.FAST_READ_TERM {false} \
- ] $uart_0
+  # Create instance: uart0
+  create_hier_cell_uart0 [current_bd_instance .] uart0
 
-  set_property -dict [ list \
-   CONFIG.SUPPORTS_NARROW_BURST {0} \
-   CONFIG.NUM_READ_OUTSTANDING {1} \
-   CONFIG.NUM_WRITE_OUTSTANDING {1} \
-   CONFIG.MAX_BURST_LENGTH {1} \
- ] [get_bd_intf_pins /uart_0/S_AXI]
-
-  # Create instance: uart_1, and set properties
-  set block_name bonfire_axi4l2wb
-  set block_cell_name uart_1
-  if { [catch {set uart_1 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
-     catch {common::send_msg_id "BD_TCL-105" "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
-     return 1
-   } elseif { $uart_1 eq "" } {
-     catch {common::send_msg_id "BD_TCL-106" "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
-     return 1
-   }
-    set_property -dict [ list \
-   CONFIG.ADRWIDTH {4} \
-   CONFIG.FAST_READ_TERM {false} \
- ] $uart_1
-
-  set_property -dict [ list \
-   CONFIG.SUPPORTS_NARROW_BURST {0} \
-   CONFIG.NUM_READ_OUTSTANDING {1} \
-   CONFIG.NUM_WRITE_OUTSTANDING {1} \
-   CONFIG.MAX_BURST_LENGTH {1} \
- ] [get_bd_intf_pins /uart_1/S_AXI]
+  # Create instance: uart1
+  create_hier_cell_uart1 [current_bd_instance .] uart1
 
   # Create instance: wishbone_subsystem_0, and set properties
   set block_name wishbone_subsystem
@@ -628,46 +928,14 @@ proc create_root_design { parentCell } {
      catch {common::send_msg_id "BD_TCL-106" "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
      return 1
    }
-  
-  # Create instance: zpuino_uart_0, and set properties
-  set block_name zpuino_uart
-  set block_cell_name zpuino_uart_0
-  if { [catch {set zpuino_uart_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
-     catch {common::send_msg_id "BD_TCL-105" "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
-     return 1
-   } elseif { $zpuino_uart_0 eq "" } {
-     catch {common::send_msg_id "BD_TCL-106" "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
-     return 1
-   }
-    set_property -dict [ list \
-   CONFIG.bits {6} \
-   CONFIG.extended {true} \
- ] $zpuino_uart_0
-
-  # Create instance: zpuino_uart_1, and set properties
-  set block_name zpuino_uart
-  set block_cell_name zpuino_uart_1
-  if { [catch {set zpuino_uart_1 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
-     catch {common::send_msg_id "BD_TCL-105" "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
-     return 1
-   } elseif { $zpuino_uart_1 eq "" } {
-     catch {common::send_msg_id "BD_TCL-106" "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
-     return 1
-   }
-    set_property -dict [ list \
-   CONFIG.bits {6} \
-   CONFIG.extended {true} \
- ] $zpuino_uart_1
 
   # Create interface connections
   connect_bd_intf_net -intf_net axi_ethernetlite_0_MDIO [get_bd_intf_ports eth_mdio_mdc] [get_bd_intf_pins axi_ethernetlite_0/MDIO]
   connect_bd_intf_net -intf_net axi_ethernetlite_0_MII [get_bd_intf_ports eth_mii] [get_bd_intf_pins axi_ethernetlite_0/MII]
   connect_bd_intf_net -intf_net axi_gpio_0_GPIO [get_bd_intf_ports led_4bits] [get_bd_intf_pins axi_gpio_0/GPIO]
-  connect_bd_intf_net -intf_net axi_gpio_0_GPIO2 [get_bd_intf_ports push_buttons_4bits] [get_bd_intf_pins axi_gpio_0/GPIO2]
   connect_bd_intf_net -intf_net axi_gpio_1_GPIO [get_bd_intf_ports dip_switches_4bits] [get_bd_intf_pins axi_gpio_1/GPIO]
+  connect_bd_intf_net -intf_net axi_gpio_1_GPIO2 [get_bd_intf_ports push_buttons_4bits] [get_bd_intf_pins axi_gpio_1/GPIO2]
   connect_bd_intf_net -intf_net axi_mem_intercon_M00_AXI [get_bd_intf_pins axi_mem_intercon/M00_AXI] [get_bd_intf_pins mig_7series_0/S_AXI]
-  connect_bd_intf_net -intf_net bonfire_axi4l2wb_0_WB_MASTER [get_bd_intf_pins uart_0/WB_MASTER] [get_bd_intf_pins zpuino_uart_0/WB_SLAVE]
-  connect_bd_intf_net -intf_net bonfire_axi4l2wb_1_WB_MASTER [get_bd_intf_pins uart_1/WB_MASTER] [get_bd_intf_pins zpuino_uart_1/WB_SLAVE]
   connect_bd_intf_net -intf_net bonfire_axi_top_0_BRAM_A [get_bd_intf_pins BootMem_0/BRAM_A] [get_bd_intf_pins bonfire_axi_top_0/BRAM_A]
   connect_bd_intf_net -intf_net bonfire_axi_top_0_BRAM_B [get_bd_intf_pins BootMem_0/BRAM_B] [get_bd_intf_pins bonfire_axi_top_0/BRAM_B]
   connect_bd_intf_net -intf_net bonfire_axi_top_0_M_AXI_DC [get_bd_intf_pins axi_mem_intercon/S00_AXI] [get_bd_intf_pins bonfire_axi_top_0/M_AXI_DC]
@@ -677,55 +945,136 @@ proc create_root_design { parentCell } {
   connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M00_AXI [get_bd_intf_pins axi_gpio_0/S_AXI] [get_bd_intf_pins bonfire_axi_top_0_axi_periph/M00_AXI]
   connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M01_AXI [get_bd_intf_pins axi_gpio_1/S_AXI] [get_bd_intf_pins bonfire_axi_top_0_axi_periph/M01_AXI]
   connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M02_AXI [get_bd_intf_pins axi_ethernetlite_0/S_AXI] [get_bd_intf_pins bonfire_axi_top_0_axi_periph/M02_AXI]
-  connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M03_AXI [get_bd_intf_pins bonfire_axi_top_0_axi_periph/M03_AXI] [get_bd_intf_pins uart_0/S_AXI]
-  connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M04_AXI [get_bd_intf_pins bonfire_axi_top_0_axi_periph/M04_AXI] [get_bd_intf_pins uart_1/S_AXI]
-  connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M05_AXI [get_bd_intf_pins axi_quad_spi_0/AXI_LITE] [get_bd_intf_pins bonfire_axi_top_0_axi_periph/M05_AXI]
+  connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M03_AXI [get_bd_intf_pins bonfire_axi_top_0_axi_periph/M03_AXI] [get_bd_intf_pins uart0/S_AXI]
+  connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M04_AXI [get_bd_intf_pins bonfire_axi_top_0_axi_periph/M04_AXI] [get_bd_intf_pins uart1/S_AXI]
+  connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M05_AXI [get_bd_intf_pins bonfire_axi_top_0_axi_periph/M05_AXI] [get_bd_intf_pins pmod_jb_spi/AXI_LITE]
+  connect_bd_intf_net -intf_net bonfire_axi_top_0_axi_periph_M06_AXI [get_bd_intf_pins bonfire_axi_top_0_axi_periph/M06_AXI] [get_bd_intf_pins bonfire_gpio_core_0/S_AXI]
+  connect_bd_intf_net -intf_net bonfire_gpio_core_0_GPIO [get_bd_intf_ports shield_dp0_dp19] [get_bd_intf_pins bonfire_gpio_core_0/GPIO]
   connect_bd_intf_net -intf_net mig_7series_0_DDR3 [get_bd_intf_ports ddr3_sdram] [get_bd_intf_pins mig_7series_0/DDR3]
+  connect_bd_intf_net -intf_net pmod_bridge_0_Pmod_out [get_bd_intf_ports jb] [get_bd_intf_pins pmod_jb_spi/jb]
+  connect_bd_intf_net -intf_net uart1_jd [get_bd_intf_ports jd] [get_bd_intf_pins uart1/jd]
+  connect_bd_intf_net -intf_net z_uart0_usb_uart [get_bd_intf_ports usb_uart] [get_bd_intf_pins uart0/usb_uart]
 
   # Create port connections
   connect_bd_net -net axi_ethernetlite_0_ip2intc_irpt [get_bd_pins axi_ethernetlite_0/ip2intc_irpt] [get_bd_pins wishbone_subsystem_0/ether_irq_in]
-  connect_bd_net -net axi_quad_spi_0_io0_o [get_bd_ports jb_mosi] [get_bd_pins axi_quad_spi_0/io0_o]
-  connect_bd_net -net axi_quad_spi_0_sck_o [get_bd_ports jb_sclk] [get_bd_pins axi_quad_spi_0/sck_o]
-  connect_bd_net -net axi_quad_spi_0_ss_o [get_bd_ports jb_cs] [get_bd_pins axi_quad_spi_0/ss_o]
-  connect_bd_net -net bonfire_axi4l2wb_0_wb_clk_o [get_bd_pins uart_0/wb_clk_o] [get_bd_pins zpuino_uart_0/wb_clk_i]
-  connect_bd_net -net bonfire_axi4l2wb_0_wb_rst_o [get_bd_pins uart_0/wb_rst_o] [get_bd_pins zpuino_uart_0/wb_rst_i]
-  connect_bd_net -net bonfire_axi4l2wb_1_wb_clk_o [get_bd_pins uart_1/wb_clk_o] [get_bd_pins zpuino_uart_1/wb_clk_i]
-  connect_bd_net -net bonfire_axi4l2wb_1_wb_rst_o [get_bd_pins uart_1/wb_rst_o] [get_bd_pins zpuino_uart_1/wb_rst_i]
-  connect_bd_net -net clk_wiz_0_clk_out1 [get_bd_pins axi_quad_spi_0/ext_spi_clk] [get_bd_pins clk_wiz_0/clk_out1] [get_bd_pins mig_7series_0/sys_clk_i]
+  connect_bd_net -net bonfire_gpio_core_0_fall_irq_o [get_bd_pins bonfire_axi_top_0/lirq3_i] [get_bd_pins bonfire_gpio_core_0/fall_irq_o]
+  connect_bd_net -net bonfire_gpio_core_0_rise_irq_o [get_bd_pins bonfire_axi_top_0/lirq4_i] [get_bd_pins bonfire_gpio_core_0/rise_irq_o]
+  connect_bd_net -net clk_wiz_0_clk_out1 [get_bd_pins clk_wiz_0/clk_out1] [get_bd_pins mig_7series_0/sys_clk_i] [get_bd_pins pmod_jb_spi/ext_spi_clk]
   connect_bd_net -net clk_wiz_0_clk_out2 [get_bd_pins clk_wiz_0/clk_out2] [get_bd_pins mig_7series_0/clk_ref_i]
   connect_bd_net -net clk_wiz_0_clk_out3 [get_bd_ports eth_ref_clk] [get_bd_pins clk_wiz_0/clk_out3]
   connect_bd_net -net flash_spi_miso_1 [get_bd_ports flash_spi_miso] [get_bd_pins wishbone_subsystem_0/flash_spi_miso]
-  connect_bd_net -net jb_miso_1 [get_bd_ports jb_miso] [get_bd_pins axi_quad_spi_0/io1_i]
   connect_bd_net -net mig_7series_0_mmcm_locked [get_bd_pins mig_7series_0/mmcm_locked] [get_bd_pins rst_mig_7series_0_83M/dcm_locked]
-  connect_bd_net -net mig_7series_0_ui_clk [get_bd_pins BootMem_0/A_CLK] [get_bd_pins BootMem_0/B_CLK] [get_bd_pins axi_ethernetlite_0/s_axi_aclk] [get_bd_pins axi_gpio_0/s_axi_aclk] [get_bd_pins axi_gpio_1/s_axi_aclk] [get_bd_pins axi_mem_intercon/ACLK] [get_bd_pins axi_mem_intercon/M00_ACLK] [get_bd_pins axi_mem_intercon/S00_ACLK] [get_bd_pins axi_mem_intercon/S01_ACLK] [get_bd_pins axi_quad_spi_0/s_axi_aclk] [get_bd_pins bonfire_axi_top_0/clk_i] [get_bd_pins bonfire_axi_top_0_axi_periph/ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M00_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M01_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M02_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M03_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M04_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M05_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/S00_ACLK] [get_bd_pins mig_7series_0/ui_clk] [get_bd_pins rst_mig_7series_0_83M/slowest_sync_clk] [get_bd_pins uart_0/S_AXI_ACLK] [get_bd_pins uart_1/S_AXI_ACLK] [get_bd_pins wishbone_subsystem_0/clk_i]
+  connect_bd_net -net mig_7series_0_ui_clk [get_bd_pins BootMem_0/A_CLK] [get_bd_pins BootMem_0/B_CLK] [get_bd_pins axi_ethernetlite_0/s_axi_aclk] [get_bd_pins axi_gpio_0/s_axi_aclk] [get_bd_pins axi_gpio_1/s_axi_aclk] [get_bd_pins axi_mem_intercon/ACLK] [get_bd_pins axi_mem_intercon/M00_ACLK] [get_bd_pins axi_mem_intercon/S00_ACLK] [get_bd_pins axi_mem_intercon/S01_ACLK] [get_bd_pins bonfire_axi_top_0/clk_i] [get_bd_pins bonfire_axi_top_0_axi_periph/ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M00_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M01_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M02_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M03_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M04_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M05_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/M06_ACLK] [get_bd_pins bonfire_axi_top_0_axi_periph/S00_ACLK] [get_bd_pins bonfire_gpio_core_0/S_AXI_ACLK] [get_bd_pins mig_7series_0/ui_clk] [get_bd_pins pmod_jb_spi/s_axi_aclk] [get_bd_pins rst_mig_7series_0_83M/slowest_sync_clk] [get_bd_pins uart0/S_AXI_ACLK] [get_bd_pins uart1/S_AXI_ACLK] [get_bd_pins wishbone_subsystem_0/clk_i]
   connect_bd_net -net mig_7series_0_ui_clk_sync_rst [get_bd_pins mig_7series_0/ui_clk_sync_rst] [get_bd_pins rst_mig_7series_0_83M/ext_reset_in]
   connect_bd_net -net reset_1 [get_bd_ports reset] [get_bd_pins clk_wiz_0/resetn] [get_bd_pins mig_7series_0/sys_rst]
   connect_bd_net -net rst_mig_7series_0_83M_interconnect_aresetn [get_bd_pins axi_mem_intercon/ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/ARESETN] [get_bd_pins rst_mig_7series_0_83M/interconnect_aresetn]
   connect_bd_net -net rst_mig_7series_0_83M_mb_reset [get_bd_pins bonfire_axi_top_0/rst_i] [get_bd_pins rst_mig_7series_0_83M/mb_reset] [get_bd_pins wishbone_subsystem_0/rst_i]
-  connect_bd_net -net rst_mig_7series_0_83M_peripheral_aresetn [get_bd_pins axi_ethernetlite_0/s_axi_aresetn] [get_bd_pins axi_gpio_0/s_axi_aresetn] [get_bd_pins axi_gpio_1/s_axi_aresetn] [get_bd_pins axi_mem_intercon/M00_ARESETN] [get_bd_pins axi_mem_intercon/S00_ARESETN] [get_bd_pins axi_mem_intercon/S01_ARESETN] [get_bd_pins axi_quad_spi_0/s_axi_aresetn] [get_bd_pins bonfire_axi_top_0_axi_periph/M00_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M01_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M02_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M03_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M04_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M05_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/S00_ARESETN] [get_bd_pins mig_7series_0/aresetn] [get_bd_pins rst_mig_7series_0_83M/peripheral_aresetn] [get_bd_pins uart_0/S_AXI_ARESETN] [get_bd_pins uart_1/S_AXI_ARESETN]
+  connect_bd_net -net rst_mig_7series_0_83M_peripheral_aresetn [get_bd_pins axi_ethernetlite_0/s_axi_aresetn] [get_bd_pins axi_gpio_0/s_axi_aresetn] [get_bd_pins axi_gpio_1/s_axi_aresetn] [get_bd_pins axi_mem_intercon/M00_ARESETN] [get_bd_pins axi_mem_intercon/S00_ARESETN] [get_bd_pins axi_mem_intercon/S01_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M00_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M01_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M02_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M03_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M04_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M05_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/M06_ARESETN] [get_bd_pins bonfire_axi_top_0_axi_periph/S00_ARESETN] [get_bd_pins bonfire_gpio_core_0/S_AXI_ARESETN] [get_bd_pins mig_7series_0/aresetn] [get_bd_pins pmod_jb_spi/s_axi_aresetn] [get_bd_pins rst_mig_7series_0_83M/peripheral_aresetn] [get_bd_pins uart0/S_AXI_ARESETN] [get_bd_pins uart1/S_AXI_ARESETN]
   connect_bd_net -net sys_clock_0_1 [get_bd_ports sys_clock_0] [get_bd_pins clk_wiz_0/clk_in1]
-  connect_bd_net -net uart0_rxd_1 [get_bd_ports uart0_rxd] [get_bd_pins zpuino_uart_0/rx]
-  connect_bd_net -net uart1_rxd_1 [get_bd_ports uart1_rxd] [get_bd_pins zpuino_uart_1/rx]
   connect_bd_net -net wishbone_subsystem_0_ether_irq_out [get_bd_pins bonfire_axi_top_0/ext_irq_i] [get_bd_pins wishbone_subsystem_0/ether_irq_out]
   connect_bd_net -net wishbone_subsystem_0_flash_spi_clk [get_bd_ports flash_spi_clk] [get_bd_pins wishbone_subsystem_0/flash_spi_clk]
   connect_bd_net -net wishbone_subsystem_0_flash_spi_cs [get_bd_ports flash_spi_cs] [get_bd_pins wishbone_subsystem_0/flash_spi_cs]
   connect_bd_net -net wishbone_subsystem_0_flash_spi_mosi [get_bd_ports flash_spi_mosi] [get_bd_pins wishbone_subsystem_0/flash_spi_mosi]
-  connect_bd_net -net zpuino_uart_0_tx [get_bd_ports uart0_txd] [get_bd_pins zpuino_uart_0/tx]
-  connect_bd_net -net zpuino_uart_0_wb_inta_o [get_bd_pins bonfire_axi_top_0/lirq6_i] [get_bd_pins zpuino_uart_0/wb_inta_o]
-  connect_bd_net -net zpuino_uart_1_enabled [get_bd_ports uart1_rts] [get_bd_pins zpuino_uart_1/enabled]
-  connect_bd_net -net zpuino_uart_1_tx [get_bd_ports uart1_txd] [get_bd_pins zpuino_uart_1/tx]
-  connect_bd_net -net zpuino_uart_1_wb_inta_o [get_bd_pins bonfire_axi_top_0/lirq5_i] [get_bd_pins zpuino_uart_1/wb_inta_o]
+  connect_bd_net -net zpuino_uart_0_wb_inta_o [get_bd_pins bonfire_axi_top_0/lirq6_i] [get_bd_pins uart0/wb_inta_o]
+  connect_bd_net -net zpuino_uart_1_wb_inta_o [get_bd_pins bonfire_axi_top_0/lirq5_i] [get_bd_pins uart1/wb_inta_o]
 
   # Create address segments
   create_bd_addr_seg -range 0x00010000 -offset 0x80E00000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DP] [get_bd_addr_segs axi_ethernetlite_0/S_AXI/Reg] SEG_axi_ethernetlite_0_Reg
   create_bd_addr_seg -range 0x00010000 -offset 0x80000000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DP] [get_bd_addr_segs axi_gpio_0/S_AXI/Reg] SEG_axi_gpio_0_Reg
   create_bd_addr_seg -range 0x00010000 -offset 0x80010000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DP] [get_bd_addr_segs axi_gpio_1/S_AXI/Reg] SEG_axi_gpio_1_Reg
-  create_bd_addr_seg -range 0x00010000 -offset 0x80040000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DP] [get_bd_addr_segs axi_quad_spi_0/AXI_LITE/Reg] SEG_axi_quad_spi_0_Reg
-  create_bd_addr_seg -range 0x00010000 -offset 0x80020000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DP] [get_bd_addr_segs uart_0/S_AXI/reg0] SEG_bonfire_axi4l2wb_0_reg0
-  create_bd_addr_seg -range 0x00010000 -offset 0x80030000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DP] [get_bd_addr_segs uart_1/S_AXI/reg0] SEG_bonfire_axi4l2wb_1_reg0
-  create_bd_addr_seg -range 0x10000000 -offset 0x00000000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DC] [get_bd_addr_segs mig_7series_0/memmap/memaddr] SEG_mig_7series_0_memaddr
+  create_bd_addr_seg -range 0x00010000 -offset 0x80040000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DP] [get_bd_addr_segs pmod_jb_spi/axi_quad_spi_0/AXI_LITE/Reg] SEG_axi_quad_spi_0_Reg
+  create_bd_addr_seg -range 0x00010000 -offset 0x80020000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DP] [get_bd_addr_segs uart0/uart_axibridge_0/S_AXI/reg0] SEG_bonfire_axi4l2wb_0_reg0
+  create_bd_addr_seg -range 0x00010000 -offset 0x80030000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DP] [get_bd_addr_segs uart1/uart_axibridge1/S_AXI/reg0] SEG_bonfire_axi4l2wb_1_reg0
+  create_bd_addr_seg -range 0x00010000 -offset 0x80050000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DP] [get_bd_addr_segs bonfire_gpio_core_0/S_AXI/reg0] SEG_bonfire_gpio_core_0_reg0
   create_bd_addr_seg -range 0x10000000 -offset 0x00000000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_IC] [get_bd_addr_segs mig_7series_0/memmap/memaddr] SEG_mig_7series_0_memaddr
+  create_bd_addr_seg -range 0x10000000 -offset 0x00000000 [get_bd_addr_spaces bonfire_axi_top_0/M_AXI_DC] [get_bd_addr_segs mig_7series_0/memmap/memaddr] SEG_mig_7series_0_memaddr
 
+  # Perform GUI Layout
+  regenerate_bd_layout -layout_string {
+   ExpandedHierarchyInLayout: "",
+   guistr: "# # String gsaved with Nlview 6.8.5  2018-01-30 bk=1.4354 VDI=40 GEI=35 GUI=JA:1.6 TLS
+#  -string -flagsOSRD
+preplace port flash_spi_cs -pg 1 -y 230 -defaultsOSRD
+preplace port shield_dp0_dp19 -pg 1 -y 680 -defaultsOSRD
+preplace port ddr3_sdram -pg 1 -y 1180 -defaultsOSRD
+preplace port flash_spi_mosi -pg 1 -y 270 -defaultsOSRD
+preplace port eth_mii -pg 1 -y 60 -defaultsOSRD
+preplace port jb -pg 1 -y 890 -defaultsOSRD
+preplace port eth_mdio_mdc -pg 1 -y 80 -defaultsOSRD
+preplace port sys_clock_0 -pg 1 -y 1440 -defaultsOSRD
+preplace port jd -pg 1 -y 1482 -defaultsOSRD
+preplace port usb_uart -pg 1 -y 1040 -defaultsOSRD
+preplace port flash_spi_miso -pg 1 -y 240 -defaultsOSRD
+preplace port push_buttons_4bits -pg 1 -y 430 -defaultsOSRD
+preplace port flash_spi_clk -pg 1 -y 250 -defaultsOSRD
+preplace port eth_ref_clk -pg 1 -y 1400 -defaultsOSRD
+preplace port led_4bits -pg 1 -y 560 -defaultsOSRD
+preplace port reset -pg 1 -y 1420 -defaultsOSRD
+preplace port jb_miso -pg 1 -y 20 -defaultsOSRD
+preplace port dip_switches_4bits -pg 1 -y 410 -defaultsOSRD
+preplace inst rst_mig_7series_0_83M -pg 1 -lvl 1 -y 1130 -defaultsOSRD
+preplace inst mig_7series_0 -pg 1 -lvl 4 -y 1220 -defaultsOSRD
+preplace inst bonfire_gpio_core_0 -pg 1 -lvl 4 -y 720 -defaultsOSRD
+preplace inst wishbone_subsystem_0 -pg 1 -lvl 4 -y 260 -defaultsOSRD
+preplace inst bonfire_axi_top_0 -pg 1 -lvl 2 -y 960 -defaultsOSRD
+preplace inst axi_gpio_0 -pg 1 -lvl 4 -y 560 -defaultsOSRD
+preplace inst uart0 -pg 1 -lvl 4 -y 1050 -defaultsOSRD
+preplace inst axi_gpio_1 -pg 1 -lvl 4 -y 420 -defaultsOSRD
+preplace inst uart1 -pg 1 -lvl 4 -y 1460 -defaultsOSRD
+preplace inst axi_ethernetlite_0 -pg 1 -lvl 4 -y 80 -defaultsOSRD
+preplace inst BootMem_0 -pg 1 -lvl 3 -y 940 -defaultsOSRD
+preplace inst pmod_jb_spi -pg 1 -lvl 4 -y 890 -defaultsOSRD
+preplace inst clk_wiz_0 -pg 1 -lvl 3 -y 1430 -defaultsOSRD
+preplace inst bonfire_axi_top_0_axi_periph -pg 1 -lvl 3 -y 600 -defaultsOSRD
+preplace inst axi_mem_intercon -pg 1 -lvl 3 -y 1180 -defaultsOSRD
+preplace netloc bonfire_axi_top_0_axi_periph_M03_AXI 1 3 1 1140
+preplace netloc zpuino_uart_0_wb_inta_o 1 1 4 410 1550 NJ 1550 NJ 1550 1570
+preplace netloc wishbone_subsystem_0_flash_spi_mosi 1 4 1 NJ
+preplace netloc mig_7series_0_mmcm_locked 1 0 5 30 1530 NJ 1530 NJ 1530 NJ 1530 1540
+preplace netloc axi_ethernetlite_0_MDIO 1 4 1 NJ
+preplace netloc wishbone_subsystem_0_flash_spi_clk 1 4 1 NJ
+preplace netloc mig_7series_0_DDR3 1 4 1 NJ
+preplace netloc wishbone_subsystem_0_ether_irq_out 1 1 4 400 1330 NJ 1330 NJ 1330 1580
+preplace netloc bonfire_axi_top_0_axi_periph_M06_AXI 1 3 1 1120
+preplace netloc zpuino_uart_1_wb_inta_o 1 1 4 420 1560 NJ 1560 NJ 1560 1550
+preplace netloc rst_mig_7series_0_83M_peripheral_aresetn 1 1 3 N 1170 700 360 1110
+preplace netloc pmod_bridge_0_Pmod_out 1 4 1 NJ
+preplace netloc bonfire_gpio_core_0_GPIO 1 4 1 NJ
+preplace netloc bonfire_axi_top_0_axi_periph_M05_AXI 1 3 1 1130
+preplace netloc bonfire_axi_top_0_axi_periph_M01_AXI 1 3 1 1080
+preplace netloc bonfire_axi_top_0_BRAM_A 1 2 1 N
+preplace netloc axi_mem_intercon_M00_AXI 1 3 1 N
+preplace netloc uart1_jd 1 4 1 1580
+preplace netloc z_uart0_usb_uart 1 4 1 NJ
+preplace netloc axi_gpio_1_GPIO2 1 4 1 NJ
+preplace netloc bonfire_axi_top_0_BRAM_B 1 2 1 N
+preplace netloc rst_mig_7series_0_83M_mb_reset 1 1 3 390 300 NJ 300 N
+preplace netloc mig_7series_0_ui_clk 1 0 5 20 870 400 800 740 350 1100 1320 1530
+preplace netloc flash_spi_miso_1 1 0 4 NJ 240 NJ 240 NJ 240 NJ
+preplace netloc bonfire_gpio_core_0_rise_irq_o 1 1 4 430 810 760J 840 1060J 970 1570
+preplace netloc bonfire_axi_top_0_M_AXI_IC 1 2 1 730
+preplace netloc bonfire_axi_top_0_M_AXI_DP 1 2 1 710
+preplace netloc bonfire_axi_top_0_M_AXI_DC 1 2 1 720
+preplace netloc wishbone_subsystem_0_flash_spi_cs 1 4 1 NJ
+preplace netloc clk_wiz_0_clk_out1 1 3 1 1080
+preplace netloc axi_gpio_0_GPIO 1 4 1 NJ
+preplace netloc bonfire_axi_top_0_axi_periph_M02_AXI 1 3 1 1070
+preplace netloc mig_7series_0_ui_clk_sync_rst 1 0 5 20 1540 NJ 1540 NJ 1540 NJ 1540 1560
+preplace netloc clk_wiz_0_clk_out2 1 3 1 1140
+preplace netloc axi_ethernetlite_0_ip2intc_irpt 1 3 2 1140 160 1580
+preplace netloc bonfire_gpio_core_0_fall_irq_o 1 1 4 430 1110 710J 1030 1060J 1120 1530
+preplace netloc sys_clock_0_1 1 0 3 NJ 1440 NJ 1440 NJ
+preplace netloc clk_wiz_0_clk_out3 1 3 2 1060J 1380 1580J
+preplace netloc axi_ethernetlite_0_MII 1 4 1 NJ
+preplace netloc axi_gpio_1_GPIO 1 4 1 NJ
+preplace netloc bonfire_axi_top_0_WB_DB 1 2 2 690 220 NJ
+preplace netloc rst_mig_7series_0_83M_interconnect_aresetn 1 1 2 N 1150 750
+preplace netloc reset_1 1 0 4 NJ 1420 NJ 1420 730 1340 1090
+preplace netloc bonfire_axi_top_0_axi_periph_M04_AXI 1 3 1 1070
+preplace netloc bonfire_axi_top_0_axi_periph_M00_AXI 1 3 1 N
+levelinfo -pg 1 0 210 560 910 1380 1600 -top -180 -bot 2030
+",
+}
 
   # Restore current instance
   current_bd_instance $oldCurInst

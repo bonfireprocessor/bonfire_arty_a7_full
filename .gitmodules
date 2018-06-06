@@ -1,0 +1,3 @@
+[submodule "bonfire-gpio-ip"]
+	path = bonfire-gpio-ip
+	url = ../bonfire-gpio-ip
