@@ -22,5 +22,5 @@ toplevel = tb_zpuino_uart
 name=github
 user=ThomasHornschuh
 repo=zpuino-uart
-version=v1.1
+version=rel1.1
 
