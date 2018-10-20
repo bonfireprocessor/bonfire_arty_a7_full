@@ -20,7 +20,7 @@ set script_folder [_tcl::get_script_folder]
 ################################################################
 # Check if script is running in correct Vivado version.
 ################################################################
-set scripts_vivado_version 2017.2
+set scripts_vivado_version 2018.2
 set current_vivado_version [version -short]
 
 if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
@@ -186,14 +186,14 @@ CONFIG.mode {H} \
  ] $BootMem_0
 
   # Create instance: axi_bram_ctrl_0, and set properties
-  set axi_bram_ctrl_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_bram_ctrl:4.0 axi_bram_ctrl_0 ]
+  set axi_bram_ctrl_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_bram_ctrl axi_bram_ctrl_0 ]
   set_property -dict [ list \
 CONFIG.DATA_WIDTH {128} \
 CONFIG.ECC_TYPE {0} \
  ] $axi_bram_ctrl_0
 
   # Create instance: axi_bram_ctrl_0_bram, and set properties
-  set axi_bram_ctrl_0_bram [ create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.3 axi_bram_ctrl_0_bram ]
+  set axi_bram_ctrl_0_bram [ create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen axi_bram_ctrl_0_bram ]
   set_property -dict [ list \
 CONFIG.Memory_Type {True_Dual_Port_RAM} \
  ] $axi_bram_ctrl_0_bram
@@ -244,10 +244,10 @@ CONFIG.VERBOSE {true} \
  ] $monitor_0
 
   # Create instance: rst_sim_clk_gen_0_83M, and set properties
-  set rst_sim_clk_gen_0_83M [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_sim_clk_gen_0_83M ]
+  set rst_sim_clk_gen_0_83M [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset rst_sim_clk_gen_0_83M ]
 
   # Create instance: sim_clk_gen_0, and set properties
-  set sim_clk_gen_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:sim_clk_gen:1.0 sim_clk_gen_0 ]
+  set sim_clk_gen_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:sim_clk_gen sim_clk_gen_0 ]
   set_property -dict [ list \
 CONFIG.FREQ_HZ {83333333} \
 CONFIG.INITIAL_RESET_CLOCK_CYCLES {10} \
@@ -255,13 +255,13 @@ CONFIG.RESET_POLARITY {ACTIVE_LOW} \
  ] $sim_clk_gen_0
 
   # Create instance: smartconnect_0, and set properties
-  set smartconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect:1.0 smartconnect_0 ]
+  set smartconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect smartconnect_0 ]
   set_property -dict [ list \
 CONFIG.HAS_ARESETN {1} \
  ] $smartconnect_0
 
   # Create instance: smartconnect_1, and set properties
-  set smartconnect_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect:1.0 smartconnect_1 ]
+  set smartconnect_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect smartconnect_1 ]
   set_property -dict [ list \
 CONFIG.NUM_CLKS {1} \
 CONFIG.NUM_MI {1} \

@@ -16,7 +16,7 @@ TARGET_OBJCOPY := $(TARGET_PREFIX)-objcopy
 HEXDUMP ?= hexdump
 
 
-PLATFORMDIR=../lib/bonfire-software/platform
+PLATFORMDIR?=../lib/bonfire-software/platform
 
 LINKDEF?=$(PLATFORMDIR)/$(PLATFORM)/firmware.ld
 
