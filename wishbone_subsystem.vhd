@@ -178,16 +178,41 @@ inst_wb_io:  entity work.wb_io PORT MAP(
 --       wb_ack_out => uart_ack
 --   );
    
-   inst_flash : entity work.wb_spi_interface 
+--   inst_flash : entity work.wb_spi_interface 
+--   PORT MAP(
+--       clk_i => clk_i,
+--       reset_i => rst_i,
+--       slave_cs_o => flash_spi_cs,
+--       slave_clk_o => flash_spi_clk,
+--       slave_mosi_o => flash_spi_mosi,
+--       slave_miso_i => flash_spi_miso,
+--       irq => open,
+--       wb_adr_in =>flash_adr ,
+--       wb_dat_in => flash_dat_wr,
+--       wb_dat_out => flash_dat_rd,
+--       wb_we_in => flash_we,
+--       wb_cyc_in => flash_cyc,
+--       wb_stb_in => flash_stb,
+--       wb_ack_out => flash_ack
+--   );
+   
+   
+      
+   inst_flash : entity work.bonfire_spi
+   GENERIC MAP (
+     WB_DATA_WIDTH=>8,
+     ADR_LOW=>2
+   )
    PORT MAP(
-       clk_i => clk_i,
-       reset_i => rst_i,
+       wb_clk_i => clk_i,
+       spi_clk_i =>clk_i,
+       wb_rst_i => rst_i,
        slave_cs_o => flash_spi_cs,
        slave_clk_o => flash_spi_clk,
        slave_mosi_o => flash_spi_mosi,
        slave_miso_i => flash_spi_miso,
        irq => open,
-       wb_adr_in =>flash_adr ,
+       wb_adr_in =>flash_adr(4 downto 2),
        wb_dat_in => flash_dat_wr,
        wb_dat_out => flash_dat_rd,
        wb_we_in => flash_we,
