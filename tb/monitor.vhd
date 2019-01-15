@@ -66,7 +66,7 @@ begin
 				print( "Monitor: value "&
 					"0x"&hstr(wbs_dat_i)&
 					" written to address "&
-					"0x"&hstr(wbs_adr_i));
+					"0x"&hstr( std_logic_vector(resize(unsigned(wbs_adr_i),32)) ));
 			end if;
 			
 			if unsigned(wbs_adr_i)=to_unsigned(0,wbs_adr_i'length) then

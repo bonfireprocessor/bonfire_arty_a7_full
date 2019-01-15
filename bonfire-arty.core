@@ -1,15 +1,13 @@
 CAPI=1
 [main]
 name = ::bonfire-arty-a7:0
-depend = ::bonfire-axi:0 ::bonfire-axi4l2wb:0 ::zpuino-uart:0
+depend = ::bonfire-axi:0 ::bonfire-axi4l2wb:0 ::zpuino-uart:0 ::bonfire-spi:0
 backend = vivado
 
 
 
 [fileset rtl]
 files = bonfire_axi_sysio.vhd wb_io.vhd
-    wb_spi_interface.vhd
-    spimaster.vhd
     BootMem.vhd
     wishbone_subsystem.vhd
 file_type=vhdlSource
@@ -26,7 +24,7 @@ files =  scripts/fusesoc_build.tcl
 
 
 [fileset user_scripts]
-files= scripts/bd_bonfire_arty_2018.1.tcl
+files= scripts/bd_bonfire_arty_2018.1.tcl scripts/bd_bonfire_arty_2018.2.tcl
 file_type=user
 
 [vivado]
