@@ -53,7 +53,7 @@ Clone the root project https://github.com/bonfireprocessor/bonfire.git
 Check the fusesoc.conf file and enter the correct path for build_root
 
 ````
-git submodule update init --recursive
+git submodule update --init --recursive
 fusesoc --config fusesoc.conf build --no-export --setup bonfire-arty-a7
 cd <your build root path>/bonfire-arty-a7_0/bld-vivado
 source <Your Xilinx install Dir>/Vivado2018.<x>/settings64.sh
