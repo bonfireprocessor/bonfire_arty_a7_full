@@ -44,7 +44,7 @@ In the Arty Image it is configured as follows:
 The Design is intended to be build with fusesoc.
 So you must first install fusesoc from https://github.com/olofk/fusesoc.git
 
-The current build script is build with Vivado 2018.2 and 2018.1, so you should one of these versions , in other cases you need to adapt the build script.
+The current build script is build with Vivado 2018.1, 2018.2 or 2019.2 so you should one of these versions , in other cases you need to adapt the build script.
 
 
 ### Setup and Build
@@ -56,7 +56,7 @@ Check the fusesoc.conf file and enter the correct path for build_root
 git submodule update --init --recursive
 fusesoc --config fusesoc.conf build --no-export --setup bonfire-arty-a7
 cd <your build root path>/bonfire-arty-a7_0/bld-vivado
-source <Your Xilinx install Dir>/Vivado2018.<x>/settings64.sh
+source <Your Xilinx install Dir>/Vivado/< your vivado version:YYYY.X>/settings64.sh
 make build-gui
 ````
 The last step will create the project and the IP Integrator design and will start the Vivado GUI. In Viavdo GUI you can use the usual implemenatition workflow to build the Bitstream. 

@@ -24,7 +24,7 @@ files =  scripts/fusesoc_build.tcl
 
 
 [fileset user_scripts]
-files= scripts/bd_bonfire_arty_2018.1.tcl scripts/bd_bonfire_arty_2018.2.tcl
+files= scripts/bd_bonfire_arty_2018.1.tcl scripts/bd_bonfire_arty_2018.2.tcl scripts/bd_bonfire_arty_2019.2.tcl
 file_type=user
 
 [vivado]
