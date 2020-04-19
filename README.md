@@ -48,10 +48,18 @@ The current build script is build with Vivado 2018.1, 2018.2 or 2019.2 so you sh
 
 
 ### Setup and Build
-Clone the root project https://github.com/bonfireprocessor/bonfire.git 
+
+Clone the root project https://github.com/bonfireprocessor/bonfire.git
+
+`git clone https://github.com/bonfireprocessor/bonfire.git`
+
+Change to the project directory
+
+`cd bonfire`
 
 Check the fusesoc.conf file and enter the correct path for build_root
 
+From the project directory execute:
 ````
 git submodule update --init --recursive
 fusesoc --config fusesoc.conf build --no-export --setup bonfire-arty-a7
