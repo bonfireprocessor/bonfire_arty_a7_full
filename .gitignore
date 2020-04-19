@@ -5,3 +5,4 @@
 *.dmp
 *.lst
 *.hex
+/scripts/backup
