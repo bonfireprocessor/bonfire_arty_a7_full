@@ -1,4 +1,6 @@
-set_property board_part digilentinc.com:arty:part0:1.1 [current_project]
+#set_property board_part digilentinc.com:arty:part0:1.1 [current_project]
+# For Arty Rev E replace above line by the following line:
+set_property board_part digilentinc.com:arty-a7-35:part0:1.0 [current_project]
 set_property target_language VHDL [current_project]
 
 
