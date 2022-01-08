@@ -56,10 +56,12 @@
 #set_property -dict { PACKAGE_PIN E16   IOSTANDARD LVCMOS33 } [get_ports jb_mosi]; #IO_L11N_T1_SRCC_15 Sch=jb_n[1]
 #set_property -dict { PACKAGE_PIN D15   IOSTANDARD LVCMOS33 } [get_ports jb_miso ]; #IO_L12P_T1_MRCC_15 Sch=jb_p[2]
 #set_property -dict { PACKAGE_PIN C15   IOSTANDARD LVCMOS33 } [get_ports { jb_sclk }]; #IO_L12N_T1_MRCC_15 Sch=jb_n[2]
-#set_property -dict { PACKAGE_PIN J17   IOSTANDARD LVCMOS33 } [get_ports { jb[4] }]; #IO_L23P_T3_FOE_B_15 Sch=jb_p[3]
-#set_property -dict { PACKAGE_PIN J18   IOSTANDARD LVCMOS33 } [get_ports { jb[5] }]; #IO_L23N_T3_FWE_B_15 Sch=jb_n[3]
-#set_property -dict { PACKAGE_PIN K15   IOSTANDARD LVCMOS33 } [get_ports { jb[6] }]; #IO_L24P_T3_RS1_15 Sch=jb_p[4]
-#set_property -dict { PACKAGE_PIN J15   IOSTANDARD LVCMOS33 } [get_ports { jb[7] }]; #IO_L24N_T3_RS0_15 Sch=jb_n[4]
+# Quick fix for I/O Placement errors in Vivado 2021.1
+set_property -dict { PACKAGE_PIN J17   IOSTANDARD LVCMOS33 } [get_ports { jb_pin7_io }]; #IO_L23P_T3_FOE_B_15 Sch=jb_p[3]
+set_property -dict { PACKAGE_PIN J18   IOSTANDARD LVCMOS33 } [get_ports { jb_pin8_io }]; #IO_L23N_T3_FWE_B_15 Sch=jb_n[3]
+set_property -dict { PACKAGE_PIN K15   IOSTANDARD LVCMOS33 } [get_ports { jb_pin9_io }]; #IO_L24P_T3_RS1_15 Sch=jb_p[4]
+set_property -dict { PACKAGE_PIN J15   IOSTANDARD LVCMOS33 } [get_ports { jb_pin10_io }]; #IO_L24N_T3_RS0_15 Sch=jb_n[4]
+
 
 ##Pmod Header JC
 
@@ -78,10 +80,11 @@
 #set_property -dict {PACKAGE_PIN D3 IOSTANDARD LVCMOS33} [get_ports uart1_txd];  #JD2
 #set_property -dict {PACKAGE_PIN F4 IOSTANDARD LVCMOS33} [get_ports uart1_rxd];  #JD3
 #set_property -dict {PACKAGE_PIN F3 IOSTANDARD LVCMOS33} [get_ports uart1_rts];  #JD4
-#set_property -dict { PACKAGE_PIN E2    IOSTANDARD LVCMOS33 } [get_ports { jd[4] }]; #IO_L14P_T2_SRCC_35 Sch=jd[7]
-#set_property -dict { PACKAGE_PIN D2    IOSTANDARD LVCMOS33 } [get_ports { jd[5] }]; #IO_L14N_T2_SRCC_35 Sch=jd[8]
-#set_property -dict { PACKAGE_PIN H2    IOSTANDARD LVCMOS33 } [get_ports { jd[6] }]; #IO_L15P_T2_DQS_35 Sch=jd[9]
-#set_property -dict { PACKAGE_PIN G2    IOSTANDARD LVCMOS33 } [get_ports { jd[7] }]; #IO_L15N_T2_DQS_35 Sch=jd[10]
+# Quick fix for I/O Placement errors in Vivado 2021.1
+set_property -dict { PACKAGE_PIN E2    IOSTANDARD LVCMOS33 } [get_ports { jd_pin7_io }]; #IO_L14P_T2_SRCC_35 Sch=jd[7]
+set_property -dict { PACKAGE_PIN D2    IOSTANDARD LVCMOS33 } [get_ports { jd_pin8_io }]; #IO_L14N_T2_SRCC_35 Sch=jd[8]
+set_property -dict { PACKAGE_PIN H2    IOSTANDARD LVCMOS33 } [get_ports { jd_pin9_io }]; #IO_L15P_T2_DQS_35 Sch=jd[9]
+set_property -dict { PACKAGE_PIN G2    IOSTANDARD LVCMOS33 } [get_ports { jd_pin10_io }]; #IO_L15N_T2_DQS_35 Sch=jd[10]
 
 ##USB-UART Interface
 
