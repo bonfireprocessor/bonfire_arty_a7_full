@@ -8,8 +8,8 @@
 --     Number of slaves:      3
 --     Master address width:  30
 --     Slave address width:   8
---     Port size:             8
---     Port granularity:      8
+--     Port size:             32
+--     Port granularity:      32
 --     Entity name:           wb_io
 --     Pipelined arbiter:     no
 --     Registered feedback:   no
@@ -32,32 +32,32 @@ entity wb_io is
 		s0_we_i: in std_logic;
 		s0_ack_o: out std_logic;
 		s0_adr_i: in std_logic_vector(29 downto 0);
-		s0_dat_i: in std_logic_vector(7 downto 0);
-		s0_dat_o: out std_logic_vector(7 downto 0);
+		s0_dat_i: in std_logic_vector(31 downto 0);
+		s0_dat_o: out std_logic_vector(31 downto 0);
 
 		m0_cyc_o: out std_logic;
 		m0_stb_o: out std_logic;
 		m0_we_o: out std_logic;
 		m0_ack_i: in std_logic;
 		m0_adr_o: out std_logic_vector(7 downto 0);
-		m0_dat_o: out std_logic_vector(7 downto 0);
-		m0_dat_i: in std_logic_vector(7 downto 0);
+		m0_dat_o: out std_logic_vector(31 downto 0);
+		m0_dat_i: in std_logic_vector(31 downto 0);
 
 		m1_cyc_o: out std_logic;
 		m1_stb_o: out std_logic;
 		m1_we_o: out std_logic;
 		m1_ack_i: in std_logic;
 		m1_adr_o: out std_logic_vector(7 downto 0);
-		m1_dat_o: out std_logic_vector(7 downto 0);
-		m1_dat_i: in std_logic_vector(7 downto 0);
+		m1_dat_o: out std_logic_vector(31 downto 0);
+		m1_dat_i: in std_logic_vector(31 downto 0);
 
 		m2_cyc_o: out std_logic;
 		m2_stb_o: out std_logic;
 		m2_we_o: out std_logic;
 		m2_ack_i: in std_logic;
 		m2_adr_o: out std_logic_vector(7 downto 0);
-		m2_dat_o: out std_logic_vector(7 downto 0);
-		m2_dat_i: in std_logic_vector(7 downto 0)
+		m2_dat_o: out std_logic_vector(31 downto 0);
+		m2_dat_i: in std_logic_vector(31 downto 0)
 	);
 end entity;
 
@@ -69,10 +69,10 @@ signal cyc_mux: std_logic;
 signal stb_mux: std_logic;
 signal we_mux: std_logic;
 signal adr_mux: std_logic_vector(29 downto 0);
-signal wdata_mux: std_logic_vector(7 downto 0);
+signal wdata_mux: std_logic_vector(31 downto 0);
 
 signal ack_mux: std_logic;
-signal rdata_mux: std_logic_vector(7 downto 0);
+signal rdata_mux: std_logic_vector(31 downto 0);
 
 begin
 

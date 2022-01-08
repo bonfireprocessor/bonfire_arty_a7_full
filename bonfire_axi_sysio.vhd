@@ -33,7 +33,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 entity bonfire_axi_sysio is
 generic (
-   SYS_ID : std_logic_vector(7 downto 0):=X"10"
+   SYS_ID : std_logic_vector(31 downto 0):=X"20210601"
   
 );
 Port (
@@ -53,8 +53,8 @@ Port (
    wbs_ack_o : out std_logic ;
    wbs_adr_i : in std_logic_vector(7 downto 0);
    
-   wbs_dat_o : out std_logic_vector(7 downto 0);
-   wbs_dat_i : in std_logic_vector(7 downto 0)
+   wbs_dat_o : out std_logic_vector(31 downto 0);
+   wbs_dat_i : in std_logic_vector(31 downto 0)
 );   
 end bonfire_axi_sysio;
 
@@ -63,13 +63,25 @@ architecture Behavioral of bonfire_axi_sysio is
 signal ether_irq_pending : std_logic :='0';
 signal ack_read :  std_logic :='0';
 
+subtype t_dbus is std_logic_vector(wbs_dat_o'high downto wbs_dat_o'low);
+
+function fill_bits(v: std_logic_vector) return t_dbus is
+   variable r : t_dbus;
+   begin
+     r(v'range):=v;
+     r(r'high downto v'length) := (others=>'0');
+     return r;
+end;
+
 begin
 
  wbs_ack_o <= ack_read or (wbs_we_i and wbs_stb_i);
  
  irq_req_o <= ether_irq_pending;
 
- process(clk_i) begin
+ process(clk_i) 
+ variable temp_vector : std_logic_vector(0 downto 0); 
+ begin  
    if rising_edge(clk_i) then
      if rst_i='1' then
        ether_irq_pending <= '0';
@@ -83,11 +95,12 @@ begin
           if  wbs_adr_i(7 downto 4)="0000" then
               case wbs_adr_i(3 downto 2) is
                 when "00" =>
-                  wbs_dat_o<="0000000"&ether_irq_pending;
+                  temp_vector(0) :=  ether_irq_pending;
+                  wbs_dat_o<= fill_bits(temp_vector);
                 when "01" =>
                   wbs_dat_o <=  SYS_ID;
                 when others=>
-                  wbs_dat_o <= (others=>'0');
+                  wbs_dat_o <= (others=>'X');
               end case;      
           end if;  
        end if;  

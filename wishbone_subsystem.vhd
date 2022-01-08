@@ -79,6 +79,8 @@ ATTRIBUTE X_INTERFACE_PARAMETER : STRING;
 ATTRIBUTE X_INTERFACE_PARAMETER of clk_i : SIGNAL is "ASSOCIATED_BUSIF WB_DB";
 --ATTRIBUTE X_INTERFACE_PARAMETER of rst_i : SIGNAL is "ASSOCIATED_BUSIF WB_DB";
 
+attribute X_INTERFACE_INFO of ether_irq_out : signal is "xilinx.com:signal:interrupt:1.0 ether_irq_out INTERRUPT";
+
 ATTRIBUTE X_INTERFACE_INFO OF wb_cyc_i: SIGNAL IS "bonfire.eu:wb:Wishbone_master:1.0 WB_DB wb_dbus_cyc_o";
 ATTRIBUTE X_INTERFACE_INFO OF wb_stb_i: SIGNAL IS "bonfire.eu:wb:Wishbone_master:1.0 WB_DB wb_dbus_stb_o";
 ATTRIBUTE X_INTERFACE_INFO OF wb_we_i: SIGNAL IS "bonfire.eu:wb:Wishbone_master:1.0  WB_DB wb_dbus_we_o";
@@ -90,7 +92,7 @@ ATTRIBUTE X_INTERFACE_INFO OF wb_dat_o: SIGNAL IS "bonfire.eu:wb:Wishbone_master
   
 
 
-signal lpc_dat_rd8, lpc_dat_wr8 : std_logic_vector(7 downto 0);
+
 
 --signal uart_cyc,uart_stb,uart_we,uart_ack : std_logic;
 --signal uart_sel :  std_logic_vector(3 downto 0);
@@ -100,13 +102,14 @@ signal lpc_dat_rd8, lpc_dat_wr8 : std_logic_vector(7 downto 0);
 -- SPI Flash
 signal flash_cyc,flash_stb,flash_we,flash_ack : std_logic;
 signal flash_sel :  std_logic_vector(3 downto 0);
-signal flash_dat_rd,flash_dat_wr : std_logic_vector(7 downto 0);
+signal flash_dat_rd,flash_dat_wr : std_logic_vector(31 downto 0);
 signal flash_adr : std_logic_vector(7 downto 0);
+signal flash_adr_9 : std_logic_vector(9 downto 2);
 
 -- sys controller
 signal sys_cyc, sys_stb,sys_we,sys_ack : std_logic;
 signal sys_sel :  std_logic_vector(3 downto 0);
-signal sys_dat_rd,sys_dat_wr : std_logic_vector(7 downto 0);
+signal sys_dat_rd,sys_dat_wr : std_logic_vector(31 downto 0);
 signal sys_adr : std_logic_vector(7 downto 0);
 
 
@@ -115,10 +118,11 @@ signal temp_adr : std_logic_vector (29 downto 0);
 begin
 
 
- lpc_dat_wr8 <= wb_dat_i(7 downto 0);
- wb_dat_o <=  X"000000"&lpc_dat_rd8;
+
  
- temp_adr <= wb_adr_i(29 downto 2) & "00";
+temp_adr <= wb_adr_i(29 downto 2) & "00";
+
+flash_adr_9 <= "00" & flash_adr(7 downto 2);
 
 inst_wb_io:  entity work.wb_io PORT MAP(
            clk_i => clk_i,
@@ -129,8 +133,8 @@ inst_wb_io:  entity work.wb_io PORT MAP(
            s0_we_i =>  wb_we_i,
            s0_ack_o => wb_ack_o,
            s0_adr_i => temp_adr ,
-           s0_dat_i =>  lpc_dat_wr8,
-           s0_dat_o =>  lpc_dat_rd8,
+           s0_dat_i =>  wb_dat_i,
+           s0_dat_o =>  wb_dat_o,
            
            m0_cyc_o =>  open,
            m0_stb_o => open,
@@ -157,62 +161,25 @@ inst_wb_io:  entity work.wb_io PORT MAP(
            m2_dat_i => sys_dat_rd
        );
        
---   inst_uart:  entity work.wb_uart_interface
---    generic map(
-  
---        FIFO_DEPTH => 64 )
-  
-  
---  PORT MAP(
---       clk =>clk_i ,
---       reset => rst_i,
---       txd => open,
---       rxd => '1',
---       irq => open,
---       wb_adr_in => uart_adr,
---       wb_dat_in => uart_dat_wr,
---       wb_dat_out => uart_dat_rd,
---       wb_we_in => uart_we,
---       wb_cyc_in => uart_cyc,
---       wb_stb_in => uart_stb,
---       wb_ack_out => uart_ack
---   );
-   
---   inst_flash : entity work.wb_spi_interface 
---   PORT MAP(
---       clk_i => clk_i,
---       reset_i => rst_i,
---       slave_cs_o => flash_spi_cs,
---       slave_clk_o => flash_spi_clk,
---       slave_mosi_o => flash_spi_mosi,
---       slave_miso_i => flash_spi_miso,
---       irq => open,
---       wb_adr_in =>flash_adr ,
---       wb_dat_in => flash_dat_wr,
---       wb_dat_out => flash_dat_rd,
---       wb_we_in => flash_we,
---       wb_cyc_in => flash_cyc,
---       wb_stb_in => flash_stb,
---       wb_ack_out => flash_ack
---   );
-   
-   
+
+    
       
    inst_flash : entity work.bonfire_spi
    GENERIC MAP (
-     WB_DATA_WIDTH=>8,
-     ADR_LOW=>2
+     WB_DATA_WIDTH=>32,
+     ADR_LOW=>2,
+     NUM_PORTS=>1
    )
    PORT MAP(
        wb_clk_i => clk_i,
        spi_clk_i =>clk_i,
        wb_rst_i => rst_i,
-       slave_cs_o => flash_spi_cs,
-       slave_clk_o => flash_spi_clk,
-       slave_mosi_o => flash_spi_mosi,
-       slave_miso_i => flash_spi_miso,
+       slave_cs_o(0) => flash_spi_cs,
+       slave_clk_o(0) => flash_spi_clk,
+       slave_mosi_o(0) => flash_spi_mosi,
+       slave_miso_i(0) => flash_spi_miso,
        irq => open,
-       wb_adr_in =>flash_adr(4 downto 2),
+       wb_adr_in =>flash_adr_9,
        wb_dat_in => flash_dat_wr,
        wb_dat_out => flash_dat_rd,
        wb_we_in => flash_we,
