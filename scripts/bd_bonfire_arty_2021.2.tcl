@@ -773,7 +773,8 @@ proc create_root_design { parentCell } {
    CONFIG.CACHE_SIZE_WORDS {8192} \
    CONFIG.DCACHE_LINE_SIZE {4} \
    CONFIG.DCACHE_MASTER_WIDTH {128} \
-   CONFIG.DCACHE_SIZE {2048} \
+   CONFIG.DCACHE_NUM_WAYS {4} \
+   CONFIG.DCACHE_SIZE {1024} \
  ] $bonfire_axi_top_0
 
   # Create instance: bonfire_axi_top_0_axi_periph, and set properties
