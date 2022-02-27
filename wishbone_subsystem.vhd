@@ -1,21 +1,12 @@
 ---------------------------------------------------------------------------
--- Company: 
--- Engineer: 
--- 
--- Create Date: 06/16/2017 03:32:41 PM
--- Design Name: 
--- Module Name: wishbone_subsystem - Behavioral
--- Project Name: 
--- Target Devices: 
--- Tool Versions: 
--- Description: 
--- 
--- Dependencies: 
--- 
--- Revision:
--- Revision 0.01 - File Created
--- Additional Comments:
--- 
+--- The Bonfire Processor Project, (c) 2016-2022 Thomas Hornschuh
+
+-- Wishbonne Subsystem for Bonfire Arty Project
+
+
+-- License: See LICENSE or LICENSE.txt File in git project root.
+
+--
 ----------------------------------------------------------------------------------
 
 
@@ -32,25 +23,28 @@ use IEEE.NUMERIC_STD.ALL;
 --use UNISIM.VComponents.all;
 
 entity wishbone_subsystem is
+generic (
+    SYS_ID : std_logic_vector(31 downto 0):=X"20220801"
+);
 Port(
 
-      
+
        -- UART0 signals:
        --uart0_txd : out std_logic;
        --uart0_rxd : in  std_logic :='1';
-       
+
        -- SPI flash chip
        flash_spi_cs        : out   std_logic;
        flash_spi_clk       : out   std_logic;
        flash_spi_mosi      : out   std_logic;
        flash_spi_miso      : in    std_logic;
-       
-       -- IRQ Controller 
+
+       -- IRQ Controller
        ether_irq_in : in std_logic;
        ether_irq_out : out std_logic;
-       
-       
-       -- Wishbone Slave 
+
+
+       -- Wishbone Slave
        clk_i: in std_logic;
        rst_i: in std_logic;
 
@@ -62,14 +56,14 @@ Port(
        wb_adr_i: in std_logic_vector(31 downto 2); -- only bits 29 downto 2 are used !
        wb_dat_i: in std_logic_vector(31 downto 0);
        wb_dat_o: out std_logic_vector(31 downto 0)
-       
-);       
+
+);
 end wishbone_subsystem;
 
 architecture Behavioral of wishbone_subsystem is
 
 -- Attribute Infos for Xilinx Vivado IP Integrator Block designs
--- Should not have negative influence on other platforms. 
+-- Should not have negative influence on other platforms.
 
 ATTRIBUTE X_INTERFACE_INFO : STRING;
 ATTRIBUTE X_INTERFACE_INFO of  clk_i : SIGNAL is "xilinx.com:signal:clock:1.0 clk_i CLK";
@@ -89,7 +83,7 @@ ATTRIBUTE X_INTERFACE_INFO OF wb_ack_o: SIGNAL IS "bonfire.eu:wb:Wishbone_master
 ATTRIBUTE X_INTERFACE_INFO OF wb_adr_i: SIGNAL IS "bonfire.eu:wb:Wishbone_master:1.0 WB_DB wb_dbus_adr_o";
 ATTRIBUTE X_INTERFACE_INFO OF wb_dat_i: SIGNAL IS "bonfire.eu:wb:Wishbone_master:1.0 WB_DB wb_dbus_dat_o";
 ATTRIBUTE X_INTERFACE_INFO OF wb_dat_o: SIGNAL IS "bonfire.eu:wb:Wishbone_master:1.0 WB_DB wb_dbus_dat_i";
-  
+
 
 
 
@@ -119,7 +113,7 @@ begin
 
 
 
- 
+
 temp_adr <= wb_adr_i(29 downto 2) & "00";
 
 flash_adr_9 <= "00" & flash_adr(7 downto 2);
@@ -127,7 +121,7 @@ flash_adr_9 <= "00" & flash_adr(7 downto 2);
 inst_wb_io:  entity work.wb_io PORT MAP(
            clk_i => clk_i,
            rst_i => rst_i,
-           
+
            s0_cyc_i => wb_cyc_i,
            s0_stb_i => wb_stb_i,
            s0_we_i =>  wb_we_i,
@@ -135,7 +129,7 @@ inst_wb_io:  entity work.wb_io PORT MAP(
            s0_adr_i => temp_adr ,
            s0_dat_i =>  wb_dat_i,
            s0_dat_o =>  wb_dat_o,
-           
+
            m0_cyc_o =>  open,
            m0_stb_o => open,
            m0_we_o =>  open,
@@ -143,7 +137,7 @@ inst_wb_io:  entity work.wb_io PORT MAP(
            m0_adr_o => open,
            m0_dat_o => open ,
            m0_dat_i => (others=>'0'),
-           
+
            m1_cyc_o =>  flash_cyc,
            m1_stb_o => flash_stb,
            m1_we_o =>  flash_we,
@@ -151,7 +145,7 @@ inst_wb_io:  entity work.wb_io PORT MAP(
            m1_adr_o => flash_adr,
            m1_dat_o => flash_dat_wr,
            m1_dat_i => flash_dat_rd,
-           
+
            m2_cyc_o => sys_cyc,
            m2_stb_o => sys_stb,
            m2_we_o =>  sys_we,
@@ -160,15 +154,15 @@ inst_wb_io:  entity work.wb_io PORT MAP(
            m2_dat_o => sys_dat_wr,
            m2_dat_i => sys_dat_rd
        );
-       
 
-    
-      
+
+
+
    inst_flash : entity work.bonfire_spi
    GENERIC MAP (
-     WB_DATA_WIDTH=>32,
-     ADR_LOW=>2,
-     NUM_PORTS=>1
+     WB_DATA_WIDTH => 32,
+     ADR_LOW => 2,
+     NUM_PORTS => 1
    )
    PORT MAP(
        wb_clk_i => clk_i,
@@ -187,8 +181,11 @@ inst_wb_io:  entity work.wb_io PORT MAP(
        wb_stb_in => flash_stb,
        wb_ack_out => flash_ack
    );
-   
-   inst_sys : entity work.bonfire_axi_sysio 
+
+   inst_sys : entity work.bonfire_axi_sysio
+   GENERIC MAP (
+    SYS_ID => SYS_ID
+   )
    PORT MAP (
       clk_i => clk_i,
       rst_i => rst_i,
@@ -200,11 +197,7 @@ inst_wb_io:  entity work.wb_io PORT MAP(
       wbs_stb_i => sys_stb,
       wbs_ack_o => sys_ack,
       ethernet_irq_i => ether_irq_in,
-      irq_req_o => ether_irq_out );
-   
-   
-   
-   
-
+      irq_req_o => ether_irq_out
+  );
 
 end Behavioral;
